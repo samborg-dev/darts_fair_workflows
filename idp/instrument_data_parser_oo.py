@@ -23,8 +23,8 @@ import pandas as pd
 import exifread
 from PIL import Image
 from PIL.TiffTags import TAGS
-import file_management as fm
-import SintonFMT_LIB
+import idp.file_management as fm
+import idp.SintonFMT_LIB as SintonFMT_LIB
 import numpy as np
 
 # Set pandas to display all columns but handle binary data

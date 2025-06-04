@@ -1,5 +1,5 @@
 import os
-from instrument_data_parser_oo import InstrumentDataParser
+from idp.instrument_data_parser_oo import InstrumentDataParser
 import pandas as pd
 
 def main():
@@ -28,6 +28,12 @@ def main():
     if image_metadata:
         image_df = pd.DataFrame(image_metadata)
         print(f"\nImage metadata shape: {image_df.shape}")
+        # Save to CSV
+        csv_dir = os.path.join(current_dir, 'csv')
+        os.makedirs(csv_dir, exist_ok=True)
+        image_csv_path = os.path.join(csv_dir, 'image_metadata.csv')
+        image_df.to_csv(image_csv_path, index=False)
+        print(f"Image metadata saved to {image_csv_path}")
     else:
         print("\nNo image metadata found")
         image_df = pd.DataFrame()
@@ -35,6 +41,12 @@ def main():
     if sinton_metadata:
         sinton_df = pd.DataFrame(sinton_metadata)
         print(f"Sinton metadata shape: {sinton_df.shape}")
+        # Save to CSV
+        csv_dir = os.path.join(current_dir, 'csv')
+        os.makedirs(csv_dir, exist_ok=True)
+        sinton_csv_path = os.path.join(csv_dir, 'sinton_metadata.csv')
+        sinton_df.to_csv(sinton_csv_path, index=False)
+        print(f"Sinton metadata saved to {sinton_csv_path}")
     else:
         print("No Sinton metadata found")
         sinton_df = pd.DataFrame()

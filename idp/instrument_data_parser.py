@@ -9,9 +9,9 @@ the database folder
 """
 import os
 import pandas as pd
-import file_management as fm
+import idp.file_management as fm
 import exifread
-import SintonFMT_LIB
+import idp.SintonFMT_LIB as SintonFMT_LIB
 from PIL import Image
 from PIL.TiffTags import TAGS
 
