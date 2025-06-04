@@ -25,6 +25,12 @@ from PIL import Image
 from PIL.TiffTags import TAGS
 import file_management as fm
 import SintonFMT_LIB
+import numpy as np
+
+# Set pandas to display all columns but handle binary data
+pd.set_option('display.max_columns', None)
+pd.set_option('display.width', None)
+pd.set_option('display.max_colwidth', 100)  # Limit column width to prevent binary data display
 
 class InstrumentDataParser:
     def __init__(self, folder_locations, sqlite_file_path):
@@ -35,6 +41,14 @@ class InstrumentDataParser:
             'isc_array_raw', 'isc_array_interp', 'intensity_array', 
             'voc_array_raw', 'voc_array_interp', 'vload_array', 'vload_array_interp'
             ]
+
+    def _format_array_data(self, data):
+        """Format array data for display"""
+        if isinstance(data, np.ndarray):
+            return data
+        elif isinstance(data, bytes):
+            return np.frombuffer(data, dtype=np.float64)
+        return data
 
     def extract_image_metadata(self, image_file):
         if image_file.endswith(".jpg"):
@@ -66,18 +80,16 @@ class InstrumentDataParser:
         failed_files = []
         el_filepaths = self.get_files_from_folders(filetype='jpg', filename_only=False)
         print(f'{len(el_filepaths)} new files found for EL')
-        frames = None
+        processed_data = []
+        
         for index, file in enumerate(el_filepaths):
             try:
                 metadata_dict = fm.get_filename_metadata(file, 'el')
                 exif_data = self.extract_image_metadata(file)
                 exif_data.update(metadata_dict)
                 exif_data['filename'] = file.split('\\')[-1]
-                frame = pd.DataFrame.from_dict(exif_data, orient='index').T
-                if index == 0:
-                    frames = frame
-                else:
-                    frames = pd.concat([frames, frame], ignore_index=True)
+                exif_data['camera'] = 'EL_CCD'
+                processed_data.append(exif_data)
             except Exception as e:
                 print(f'{file} failed to be processed, please review. {e}')
                 failed_files.append(file)
@@ -85,14 +97,9 @@ class InstrumentDataParser:
             if (index % 10 == 0):
                 print(f'{index} EL Images processed so far...')
         
-        if frames is not None:
-            frames = frames.dropna(axis=1, how='all')
-            frames = frames.loc[:, frames.notna().all(axis=0)]
-            frames['camera'] = 'EL_CCD'
-            Image_Metadata = frames.reset_index()
-            return Image_Metadata, failed_files
-        else:
-            return pd.DataFrame(), failed_files
+        print(f'Successfully processed {len(processed_data)} EL images')
+        print(f'Failed to process {len(failed_files)} EL images')
+        return processed_data, failed_files
 
     def parse_sinton_fmt_metadata(self):
         failed_files = []
@@ -100,16 +107,20 @@ class InstrumentDataParser:
         txt_filenames = self.get_files_from_folders(filetype='txt', filename_only=True)
         print(f'{len(mfr_filepaths)} new files found ending in .MFR')
         print(f'{len(txt_filenames)} new files found ending in .TXT')
-        pd.set_option('display.max_colwidth', None)
-        frames = None
+        
+        processed_data = []
         for index, file in enumerate(mfr_filepaths):
             try:
                 data, content = SintonFMT_LIB.import_raw_data_from_file(file)
                 metadata_dict = fm.get_filename_metadata(file, datatype='iv')
                 corrected_data = SintonFMT_LIB.correct_raw_data(data)
                 interpol_data = SintonFMT_LIB.interpolate_load_data(corrected_data)
+                
+                # Convert array data to numpy arrays
                 for array in self.arrays:
-                    interpol_data[array] = interpol_data[array].tobytes()
+                    if array in interpol_data:
+                        interpol_data[array] = np.array(interpol_data[array])
+                
                 content = {item.split('=')[0]: item.split('=')[1].replace('"', '').strip() for item in content if '=' in item}
                 content.update(metadata_dict)
                 content.update(interpol_data)
@@ -119,29 +130,23 @@ class InstrumentDataParser:
                     content['txt_file'] = content['filename'].replace('mfr', 'txt')
                 else:
                     content['txt_file'] = 'N/A'
-                if index == 0:
-                    frames = pd.DataFrame.from_dict(content, orient='index').T
-                else:
-                    frames = pd.concat([frames, pd.DataFrame([content])], ignore_index=True)
+                
+                # Clean empty strings
+                for key, value in content.items():
+                    if isinstance(value, str) and value.strip() == "":
+                        content[key] = None
+                
+                processed_data.append(content)
             except Exception as e:
                 print(f'{file} failed to be processed, please review. {e}')
                 failed_files.append(file)
                 continue
             if (index % 10 == 0):
                 print(f'{index} IV curves processed so far...')
-        if frames is not None:
-            # Handle empty strings only in non-array columns
-            non_array_cols = [col for col in frames.columns if col not in self.arrays]
-            for col in non_array_cols:
-                # First convert any non-string values to strings
-                frames[col] = frames[col].astype(str)
-                # Then convert empty strings to NaN
-                frames[col] = frames[col].apply(lambda x: float('NaN') if x.strip() == "" else x)
-            frames = frames.loc[:, frames.notna().all(axis=0)]
-            Sinton_IV_Metadata = frames.reset_index()
-            return Sinton_IV_Metadata, failed_files
-        else:
-            return pd.DataFrame(), failed_files
+        
+        print(f'Successfully processed {len(processed_data)} IV curves')
+        print(f'Failed to process {len(failed_files)} IV curves')
+        return processed_data, failed_files
 
 # Example usage:
 # parser = InstrumentDataParser(folder_locations=['path/to/folders'], sqlite_file_path='path/to/sqlite.db')
