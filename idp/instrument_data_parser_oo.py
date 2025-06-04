@@ -148,6 +148,28 @@ class InstrumentDataParser:
         print(f'Failed to process {len(failed_files)} IV curves')
         return processed_data, failed_files
 
+    def log_parsing_results(self, image_metadata, failed_image_files, sinton_metadata, failed_sinton_files):
+        """Log the results of parsing image and Sinton metadata."""
+        if image_metadata:
+            print(f"\nImage metadata shape: {len(image_metadata)}")
+        else:
+            print("\nNo image metadata found")
+
+        if sinton_metadata:
+            print(f"Sinton metadata shape: {len(sinton_metadata)}")
+        else:
+            print("No Sinton metadata found")
+
+        if failed_image_files:
+            print("\nFailed to process the following image files:")
+            for file in failed_image_files:
+                print(f"- {file}")
+
+        if failed_sinton_files:
+            print("\nFailed to process the following Sinton files:")
+            for file in failed_sinton_files:
+                print(f"- {file}")
+
 # Example usage:
 # parser = InstrumentDataParser(folder_locations=['path/to/folders'], sqlite_file_path='path/to/sqlite.db')
 # image_metadata, failed_image_files = parser.parse_image_metadata()

@@ -1,6 +1,8 @@
 import os
 from idp.instrument_data_parser_oo import InstrumentDataParser
+from idp.idp_outputer import IDPOutputer
 import pandas as pd
+import base64
 
 def main():
     # Get the current directory
@@ -24,16 +26,19 @@ def main():
     print("\nParsing Sinton FMT metadata...")
     sinton_metadata, failed_sinton_files = parser.parse_sinton_fmt_metadata()
 
+    # Log parsing results
+    parser.log_parsing_results(image_metadata, failed_image_files, sinton_metadata, failed_sinton_files)
+
     # Convert lists to DataFrames for database storage
     if image_metadata:
         image_df = pd.DataFrame(image_metadata)
         print(f"\nImage metadata shape: {image_df.shape}")
+        # Encode JPEGThumbnail as base64
+        if 'JPEGThumbnail' in image_df.columns:
+            image_df['JPEGThumbnail'] = image_df['JPEGThumbnail'].apply(lambda x: base64.b64encode(x).decode('utf-8') if isinstance(x, bytes) else x)
         # Save to CSV
-        csv_dir = os.path.join(current_dir, 'csv')
-        os.makedirs(csv_dir, exist_ok=True)
-        image_csv_path = os.path.join(csv_dir, 'image_metadata.csv')
-        image_df.to_csv(image_csv_path, index=False)
-        print(f"Image metadata saved to {image_csv_path}")
+        outputer = IDPOutputer(current_dir)
+        outputer.save_to_csv(image_df, 'el_image_data.csv')
     else:
         print("\nNo image metadata found")
         image_df = pd.DataFrame()
@@ -42,25 +47,11 @@ def main():
         sinton_df = pd.DataFrame(sinton_metadata)
         print(f"Sinton metadata shape: {sinton_df.shape}")
         # Save to CSV
-        csv_dir = os.path.join(current_dir, 'csv')
-        os.makedirs(csv_dir, exist_ok=True)
-        sinton_csv_path = os.path.join(csv_dir, 'sinton_metadata.csv')
-        sinton_df.to_csv(sinton_csv_path, index=False)
-        print(f"Sinton metadata saved to {sinton_csv_path}")
+        outputer = IDPOutputer(current_dir)
+        outputer.save_to_csv(sinton_df, 'sinton_metadata.csv')
     else:
         print("No Sinton metadata found")
         sinton_df = pd.DataFrame()
-
-    # Print failed files if any
-    if failed_image_files:
-        print("\nFailed to process the following image files:")
-        for file in failed_image_files:
-            print(f"- {file}")
-
-    if failed_sinton_files:
-        print("\nFailed to process the following Sinton files:")
-        for file in failed_sinton_files:
-            print(f"- {file}")
 
 if __name__ == "__main__":
     main() 
